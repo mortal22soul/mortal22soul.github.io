@@ -1,6 +1,8 @@
-.container {
-  position: absolute;
-  top: 25%;
-  left: 25%;
-  /* background-color: red; */
+@media screen and (min-width: 768px) {
+  .container {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
 }
