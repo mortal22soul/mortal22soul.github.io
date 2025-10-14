@@ -59,6 +59,24 @@ const { title, description, image = "/favicon.ico" } = Astro.props;
 <meta property="twitter:description" content={description} />
 <meta property="twitter:image" content={new URL(image, Astro.url)} />
 
+<!-- JSON-LD Structured Data -->
+<script is:inline type="application/ld+json" set:html={JSON.stringify({
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": SITE.NAME,
+  "url": Astro.site,
+  "description": description,
+  "author": {
+    "@type": "Person",
+    "name": SITE.NAME,
+    "url": Astro.site,
+    "sameAs": [
+      "https://github.com/mortal22soul",
+      "https://www.linkedin.com/in/aryanmehesare"
+    ]
+  }
+})} />
+
 <ClientRouter  />
 
 <!-- RSS Link -->
