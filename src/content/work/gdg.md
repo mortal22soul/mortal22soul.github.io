@@ -2,7 +2,7 @@
 company: "GDG on Campus"
 role: "Web Developer"
 dateStart: "10/01/2024"
-dateEnd: "Present"
+dateEnd: "10/04/2026"
 ---
 
-Working as a web developer
+Worked as a web developer.
