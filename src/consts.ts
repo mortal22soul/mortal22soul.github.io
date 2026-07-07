@@ -5,12 +5,13 @@ export const SITE: Site = {
   EMAIL: "aryanmehesare@gmail.com",
   NUM_POSTS_ON_HOMEPAGE: 2,
   NUM_WORKS_ON_HOMEPAGE: 2,
-  NUM_PROJECTS_ON_HOMEPAGE: 2,
+  NUM_PROJECTS_ON_HOMEPAGE: 4,
 };
 
 export const HOME: Metadata = {
   TITLE: "Home",
-  DESCRIPTION: "Welcome to my portfolio, where I share my work and thoughts.",
+  DESCRIPTION:
+    "AI/ML & DevOps Engineer building AI-driven systems and full-stack applications. Looking for full-time opportunities in software engineering, AI/ML, and DevOps roles.",
 };
 
 export const BLOG: Metadata = {
@@ -20,12 +21,14 @@ export const BLOG: Metadata = {
 
 export const WORK: Metadata = {
   TITLE: "Work",
-  DESCRIPTION: "Where I have worked and what I have done.",
+  DESCRIPTION:
+    "My internships and professional experience in AI/ML, DevOps, and full-stack development.",
 };
 
 export const PROJECTS: Metadata = {
   TITLE: "Projects",
-  DESCRIPTION: "A collection of my projects, with links to repositories.",
+  DESCRIPTION:
+    "A collection of my projects spanning AI/ML, audio forensics, image super-resolution, IoT safety platforms, and DevOps pipelines.",
 };
 
 export const SOCIALS: Socials = [

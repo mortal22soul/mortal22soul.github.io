@@ -26,16 +26,26 @@ const { title, description, image = "/og-image.png" } = Astro.props;
 <!-- Global Metadata -->
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
-<link rel="icon" type="image/svg+xml" href="/favicon.ico" media="(prefers-color-scheme: dark)">
-<link rel="icon" type="image/svg+xml" href="/favicon.ico" media="(prefers-color-scheme: light)">
-<link rel="icon" type="image/x-icon" href="/favicon.ico">
+<link
+  rel="icon"
+  type="image/svg+xml"
+  href="/favicon.ico"
+  media="(prefers-color-scheme: dark)"
+/>
+<link
+  rel="icon"
+  type="image/svg+xml"
+  href="/favicon.ico"
+  media="(prefers-color-scheme: light)"
+/>
+<link rel="icon" type="image/x-icon" href="/favicon.ico" />
 <meta name="generator" content={Astro.generator} />
 
 <!-- Font preloads -->
-<link rel="preload" href={inter400} as="font" type="font/woff2" crossorigin/>
-<link rel="preload" href={inter600} as="font" type="font/woff2" crossorigin/>
-<link rel="preload" href={lora400} as="font" type="font/woff2" crossorigin/>
-<link rel="preload" href={lora600} as="font" type="font/woff2" crossorigin/>
+<link rel="preload" href={inter400} as="font" type="font/woff2" crossorigin />
+<link rel="preload" href={inter600} as="font" type="font/woff2" crossorigin />
+<link rel="preload" href={lora400} as="font" type="font/woff2" crossorigin />
+<link rel="preload" href={lora600} as="font" type="font/woff2" crossorigin />
 
 <!-- Canonical URL -->
 <link rel="canonical" href={canonicalURL} />
@@ -60,36 +70,45 @@ const { title, description, image = "/og-image.png" } = Astro.props;
 <meta property="twitter:image" content={new URL(image, Astro.url)} />
 
 <!-- JSON-LD Structured Data -->
-<script is:inline type="application/ld+json" set:html={JSON.stringify({
-  "@context": "https://schema.org",
-  "@type": "WebSite",
-  "name": SITE.NAME,
-  "url": Astro.site,
-  "description": description,
-  "author": {
-    "@type": "Person",
-    "name": SITE.NAME,
-    "url": Astro.site,
-    "sameAs": [
-      "https://github.com/mortal22soul",
-      "https://www.linkedin.com/in/aryanmehesare"
-    ]
-  }
-})} />
+<script
+  is:inline
+  type="application/ld+json"
+  set:html={JSON.stringify({
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE.NAME,
+    url: Astro.site,
+    description: description,
+    author: {
+      "@type": "Person",
+      name: SITE.NAME,
+      url: Astro.site,
+      sameAs: [
+        "https://github.com/mortal22soul",
+        "https://www.linkedin.com/in/aryanmehesare",
+      ],
+    },
+  })}
+/>
 
-<ClientRouter  />
+<ClientRouter />
 
 <!-- RSS Link -->
-<link rel="alternate" type="application/rss+xml" title={SITE.NAME} href={new URL("rss.xml", Astro.site)} />
+<link
+  rel="alternate"
+  type="application/rss+xml"
+  title={SITE.NAME}
+  href={new URL("rss.xml", Astro.site)}
+/>
 
 <script>
   import type { TransitionBeforeSwapEvent } from "astro:transitions/client";
   document.addEventListener("astro:before-swap", (e) =>
     [
       ...(e as TransitionBeforeSwapEvent).newDocument.head.querySelectorAll(
-        "link[as=\"font\"]"
+        'link[as="font"]',
       ),
-    ].forEach((link) => link.remove())
+    ].forEach((link) => link.remove()),
   );
 </script>
 
@@ -123,13 +142,13 @@ const { title, description, image = "/og-image.png" } = Astro.props;
       toggleTheme(window.matchMedia("(prefers-color-scheme: dark)").matches);
     });
 
-    window.matchMedia("(prefers-color-scheme: dark)")
-      .addEventListener("change", event => {
+    window
+      .matchMedia("(prefers-color-scheme: dark)")
+      .addEventListener("change", (event) => {
         if (localStorage.theme === "system" || !localStorage.theme) {
           toggleTheme(event.matches);
         }
-      }
-    );
+      });
 
     document.addEventListener("scroll", onScroll);
   }
@@ -156,11 +175,11 @@ const { title, description, image = "/og-image.png" } = Astro.props;
     event.preventDefault();
     window.scrollTo({
       top: 0,
-      behavior: "smooth"
+      behavior: "smooth",
     });
   }
 
-function toggleTheme(dark) {
+  function toggleTheme(dark) {
     const css = document.createElement("style");
 
     css.appendChild(
@@ -173,7 +192,7 @@ function toggleTheme(dark) {
              transition: none !important;
           }
         `,
-      )
+      ),
     );
 
     document.head.appendChild(css);
@@ -184,7 +203,8 @@ function toggleTheme(dark) {
       document.documentElement.classList.remove("dark");
     }
 
-  window.getComputedStyle(css).opacity;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- Force CSS reflow
+    window.getComputedStyle(css).opacity;
     document.head.removeChild(css);
   }
 
