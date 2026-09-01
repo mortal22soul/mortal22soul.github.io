@@ -6,15 +6,15 @@ demoURL: ""
 repoURL: "https://github.com/mortal22soul/e2e-cicd-pipeline"
 ---
 
-# Building an End-to-End DevSecOps CI/CD Pipeline
+# Building an end-to-end DevSecOps CI/CD pipeline
 
-The honest reason I built this: I got tired of pipelines that were just a fancy way of running `npm install && docker push`. They tell you the build passed but say nothing about whether the image you just shipped has a known CVE, or whether your dependencies have been piling up vulnerabilities for months.
+I built this because I got tired of pipelines that were little more than a fancy way to run `npm install && docker push`. A passing build says nothing about known CVEs in the image or vulnerabilities that have accumulated in its dependencies.
 
-So I built one that treats security as part of the process, not an add-on. The app itself is a small Node.js API about planets. The pipeline around it is what this post is really about.
+I wanted security checks inside the process rather than bolted on afterward. The application is a small Node.js API about planets. I kept it simple because the pipeline is the interesting part.
 
-## The App
+## The app
 
-The Solar System API is a Node.js/Express app backed by MongoDB. It has a `/live` endpoint for health checks and a `/planet` endpoint that returns planet data. That's it. Simple enough that you can focus on what the pipeline does to it rather than what the app does.
+The Solar System API is a Node.js and Express application backed by MongoDB. Its `/live` endpoint handles health checks, while `/planet` returns planet data. That is the whole application. There is no business logic to distract from what happens in the pipeline.
 
 The Dockerfile stays small on purpose:
 
@@ -34,11 +34,11 @@ EXPOSE 8000
 CMD [ "npm", "start" ]
 ```
 
-Alpine base, lightweight image. The placeholder env vars show what the container needs — the real values come from Jenkins at runtime and never get written into the image. This matters because anything baked into an image layer can be pulled out with `docker history`, even if you change it later.
+I use Alpine to keep the image small. The placeholder environment variables document what the container needs. Jenkins supplies the real values at runtime, so they never enter an image layer. If a secret does enter a layer, someone can retrieve it with `docker history` even after a later layer changes it.
 
-## Pipeline Structure
+## Pipeline structure
 
-The pipeline is a Jenkins declarative pipeline, defined in `Jenkinsfile`. There are three paths depending on which branch triggered the build:
+The `Jenkinsfile` defines a declarative pipeline. The triggering branch selects one of three paths:
 
 | Branch      | What happens                                              |
 | ----------- | --------------------------------------------------------- |
@@ -46,7 +46,7 @@ The pipeline is a Jenkins declarative pipeline, defined in `Jenkinsfile`. There 
 | `PR*`       | Build → scan → update GitOps repo → DAST → upload reports |
 | `main`      | Build → scan → deploy to Lambda → smoke test              |
 
-A couple of global settings that are worth pointing out:
+These global settings prevent stalled or overlapping jobs:
 
 ```groovy
 options {
@@ -56,19 +56,19 @@ options {
 }
 ```
 
-`disableConcurrentBuilds abortPrevious: true` is the one that saves the most headaches. If you push twice on the same branch back to back, Jenkins cancels the first run instead of running both at once. On a self-hosted Jenkins with limited memory, this matters a lot.
+`disableConcurrentBuilds abortPrevious: true` has saved me the most trouble. If I push twice to the same branch in quick succession, Jenkins cancels the first run instead of running both. My self-hosted Jenkins instance has limited memory, so overlapping builds can make it unresponsive.
 
-## Security Scanning
+## Security scanning
 
-Most pipelines that call themselves "DevSecOps" have one SAST scan somewhere and leave it at that. This one runs five checks across three different points: your dependencies, your source code, and the built image.
+I have seen plenty of pipelines called "DevSecOps" because they run one SAST scan. That is too thin to be useful. This pipeline runs five checks against the dependencies, source code, built image, and live application.
 
-### Dependency Scanning (Parallel)
+### Parallel dependency scanning
 
-Two scans run in parallel right after `npm install`:
+Two scans run in parallel immediately after `npm install`.
 
-**npm audit** with `--audit-level=critical` — a quick check for known bad packages. It logs the result but doesn't fail the stage because the next scan is the real gate.
+`npm audit` runs with `--audit-level=critical` for a quick check of known vulnerable packages. It logs its result but does not fail the stage because Dependency-Check is the actual gate.
 
-**OWASP Dependency-Check** checks every package against the NIST vulnerability database. The first time it runs, it downloads the full database so it can be slow. After that it's much faster. Here's the config:
+OWASP Dependency-Check compares every package with the NIST vulnerability database. Its first run downloads the full database and takes a while. Later runs use the cached data and finish much faster. I configured it like this:
 
 ```groovy
 dependencyCheck additionalArguments: '''
@@ -86,17 +86,17 @@ dependencyCheckPublisher(
 )
 ```
 
-If it finds more than four critical issues, the build stops. `--format "ALL"` outputs HTML, JSON, XML, and JUnit at the same time — the JUnit file shows up in Jenkins' test panel inline so you don't have to download a separate file to see what's flagged.
+The build stops if the scan finds more than four critical issues. `--format "ALL"` produces HTML, JSON, XML, and JUnit output. Jenkins displays the JUnit file in its test panel, which lets me inspect findings without downloading a report.
 
-### Unit Testing and Code Coverage
+### Unit testing and code coverage
 
-Tests run with `retry(2)` on the stage so one flaky network call to MongoDB doesn't kill an otherwise good build.
+The test stage uses `retry(2)`. One flaky network call to MongoDB should not kill an otherwise good build, but a repeat failure still stops it.
 
-Code coverage uses Istanbul/nyc. The stage uses `catchError` so that low coverage marks the stage yellow (unstable) rather than failing the whole build outright. The full lcov report gets published as an HTML panel in Jenkins.
+I collect coverage with Istanbul and nyc. The stage uses `catchError`, so low coverage marks it as unstable instead of failing the entire build. Jenkins publishes the full lcov report in an HTML panel.
 
-### SAST — SonarQube
+### SAST with SonarQube
 
-After coverage runs, SonarQube scans the source code:
+After coverage completes, SonarQube scans the source code:
 
 ```groovy
 withSonarQubeEnv('sonarqube') {
@@ -110,9 +110,9 @@ withSonarQubeEnv('sonarqube') {
 waitForQualityGate abortPipeline: true
 ```
 
-Passing the lcov path lets SonarQube flag security-relevant lines that also have no tests. `waitForQualityGate abortPipeline: true` waits for the server to finish the scan and then kills the pipeline if the quality gate fails. Nothing gets built or pushed if the code doesn't pass.
+The lcov path lets SonarQube identify security-relevant lines without test coverage. `waitForQualityGate abortPipeline: true` waits for the server to finish its analysis and stops the pipeline if the quality gate fails. A failed gate means no image gets built or pushed.
 
-### Container Scanning — Trivy
+### Container scanning with Trivy
 
 After the Docker build, Trivy runs twice:
 
@@ -130,11 +130,11 @@ trivy image $DOCKERHUB_USR/solar-system:$GIT_COMMIT \
     --format json -o trivy-image-CRITICAL-results.json
 ```
 
-The first pass records LOW through HIGH but doesn't fail the build (`--exit-code 0`). The second pass checks CRITICAL only and does fail the build (`--exit-code 1`). You get full visibility in the reports without blocking on every medium-risk finding. Both JSON files get converted to HTML and JUnit at the end using Trivy's template engine.
+The first pass records findings from LOW through HIGH but returns success because it uses `--exit-code 0`. The second checks only CRITICAL findings and fails the build with `--exit-code 1`. This records lower severity issues without blocking every build on them. At the end, Trivy's template engine converts both JSON files to HTML and JUnit reports.
 
-### DAST — OWASP ZAP
+### DAST with OWASP ZAP
 
-Dynamic testing runs on `PR*` branches after the app is live on Kubernetes. ZAP targets the OpenAPI spec to find and test every route:
+Dynamic testing runs on `PR*` branches after Kubernetes has deployed the application. ZAP reads the OpenAPI specification to find and test each route:
 
 ```bash
 docker run -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap.sh \
@@ -145,13 +145,13 @@ docker run -v $(pwd):/zap/wrk/:rw -t zaproxy/zap-stable zap.sh \
     -c zap_ignore_rules.conf
 ```
 
-The `-f openapi` flag makes ZAP test only the documented endpoints rather than trying to crawl. `zap_ignore_rules.conf` filters out false positives for things that don't apply to an API — like missing `X-Frame-Options`, which only matters if you're serving HTML.
+The `-f openapi` flag restricts ZAP to documented endpoints instead of asking it to crawl the application. `zap_ignore_rules.conf` filters false positives that do not apply to this API. One example is a missing `X-Frame-Options` header, which matters when serving HTML rather than JSON.
 
-## Deployment Paths
+## Deployment paths
 
-### Feature Branches → EC2
+### Feature branches to EC2
 
-Fast loop for testing in-progress work. Jenkins SSHs into the EC2 instance, stops the old container if one is running, and starts a new one:
+Feature branches need a short feedback loop. Jenkins connects to the EC2 instance over SSH, stops the existing container when present, and starts the new image:
 
 ```bash
 ssh -o StrictHostKeyChecking=no ubuntu@<EC2_IP> "
@@ -167,13 +167,13 @@ sudo docker run --name solar-system \
 "
 ```
 
-After the container starts, `integration-testing-ec2.sh` hits the live endpoint to check the app actually works — not just that the container came up.
+After the container starts, `integration-testing-ec2.sh` calls the live endpoint. A running container is not enough. The application must answer a request.
 
-### PR Branches → Kubernetes via GitOps
+### PR branches to Kubernetes through GitOps
 
-This path doesn't deploy directly. Instead the pipeline updates the image tag in a separate GitOps repo and raises a PR there. ArgoCD watches that repo and rolls out the change when the PR is merged.
+This path does not deploy directly. The pipeline updates the image tag in a separate GitOps repository and opens a PR there. ArgoCD watches that repository and rolls out the change after the PR merges.
 
-The image tag update is a one-liner `sed` in the deployment manifest:
+A single `sed` command updates the image tag in the deployment manifest:
 
 ```bash
 sed -i "s#$DOCKERHUB_USR/solar-system:.*#$DOCKERHUB_USR/solar-system:$GIT_COMMIT#g" deployment.yml
@@ -182,9 +182,9 @@ git commit -am "Updated docker image"
 git push -u origin feature-$BUILD_ID
 ```
 
-Then a PR is raised via the **Gitea** API (the self-hosted Git server). Once you confirm the PR is merged and ArgoCD has synced, the pipeline moves on to DAST. Keeping that order matters — ZAP tests what's actually running, not what was running before.
+The pipeline then opens a PR through the Gitea API. Gitea is the self-hosted Git server in this setup. Once the PR has merged and ArgoCD has synced, the pipeline proceeds to DAST. The order matters because ZAP must test the version that the PR deployed, not the previous one.
 
-The Kubernetes deployment runs two replicas. MongoDB credentials come from a **Bitnami Sealed Secret** — encrypted at rest in the repo, decrypted inside the cluster by the Sealed Secrets controller:
+The Kubernetes deployment runs two replicas. MongoDB credentials come from a Bitnami Sealed Secret. The repository contains encrypted values, and the Sealed Secrets controller decrypts them inside the cluster:
 
 ```yaml
 spec:
@@ -201,13 +201,13 @@ spec:
                 name: mongo-db-creds
 ```
 
-`dnsPolicy: Default` tells the pod to use the node's DNS resolver instead of the cluster's internal one. Without it, pods can't reach external hostnames like a MongoDB connection string pointing outside the cluster.
+`dnsPolicy: Default` makes the pod use the node's DNS resolver instead of the cluster's internal resolver. In this setup, pods otherwise cannot resolve the external hostname in the MongoDB connection string.
 
-Sealed Secrets means you can commit the encrypted secret file to Git safely. The raw credentials never appear in the repo. The Sealed Secrets controller running in the cluster is the only thing that can decrypt it.
+I can commit the encrypted Sealed Secret to Git without exposing the raw credentials. Only the Sealed Secrets controller in the cluster has the key needed to decrypt it.
 
-### Main Branch → Lambda
+### Main branch to Lambda
 
-Production runs serverless. The app needs a small change to work as a Lambda function — `app.listen` gets removed and a handler gets exported. Jenkins does this with `sed` inline before zipping everything up:
+Production runs on Lambda. The application needs one small change for that environment. Jenkins uses `sed` to remove `app.listen` and export a handler before creating the zip:
 
 ```groovy
 s3Upload(
@@ -222,11 +222,11 @@ sh """
 """
 ```
 
-After uploading the zip and updating the function, `update-function-configuration` sets the MongoDB credentials as Lambda environment variables. A `curl` against the Function URL after 30 seconds confirms the function is responding with `200 OK`.
+After uploading the zip and updating the function, `update-function-configuration` sets the MongoDB credentials as Lambda environment variables. The pipeline waits 30 seconds, then calls the Function URL with `curl` and expects `200 OK`.
 
-## Report Archiving
+## Report archiving
 
-Every build uploads all its reports to S3, regardless of branch:
+Every build uploads its reports to S3, regardless of branch:
 
 ```groovy
 sh '''
@@ -243,9 +243,9 @@ withAWS(credentials: 'aws-s3-ec2-lambda-creds', region: 'us-east-2') {
 }
 ```
 
-OWASP results, Trivy outputs, ZAP report, coverage — all of it, per build. If something breaks in production three months from now and you need to check what the scans looked like on a specific commit, it's there.
+Each build retains its OWASP results, Trivy output, ZAP report, and coverage data. If production breaks three months later, I can inspect the scans for the exact commit that was deployed.
 
-## Notifications — Slack
+## Slack notifications
 
 Every run sends a Slack message when it finishes, pass or fail:
 
@@ -258,11 +258,11 @@ def slackNotificationMethod(String buildStatus = 'STARTED') {
 }
 ```
 
-Green for success, yellow for unstable, red for failure. The message has the build number and a direct link. Nobody has to keep a Jenkins tab open to know what's happening.
+Success messages are green, unstable builds are yellow, and failures are red. Each message includes the build number and a direct link. I do not need to leave a Jenkins tab open while a build runs.
 
-## Infrastructure as Code — Terraform
+## Infrastructure as code with Terraform
 
-All the AWS bits the pipeline needs are defined in `terraform/`, split into three modules:
+The `terraform/` directory defines the AWS resources in three modules:
 
 ```
 terraform/
@@ -276,11 +276,11 @@ terraform/
     └── lambda/
 ```
 
-**`modules/ec2`** creates the Ubuntu instance used for feature-branch testing. Docker is installed on first boot via `user_data` so Jenkins can SSH in and run containers straight away. SSH access is locked to your Jenkins server's IP only.
+`modules/ec2` creates the Ubuntu instance used to test feature branches. Its `user_data` installs Docker on first boot, which allows Jenkins to connect over SSH and run containers. The security group allows SSH only from the Jenkins server's IP address.
 
-**`modules/s3`** creates two private buckets — one for build reports (with a 90-day expiry so old reports clean themselves up) and one for Lambda deployment zips. Both are fully private with versioning on.
+`modules/s3` creates two private, versioned buckets. One stores build reports and expires them after 90 days. The other stores Lambda deployment archives.
 
-**`modules/lambda`** creates the function and its IAM role. There's a `lifecycle` block that intentionally ignores the deployment artifact and env vars:
+`modules/lambda` creates the function and its IAM role. Its `lifecycle` block deliberately ignores the deployment artifact and environment variables:
 
 ```hcl
 lifecycle {
@@ -288,9 +288,9 @@ lifecycle {
 }
 ```
 
-Terraform owns the function's config — runtime, memory, timeout, IAM. Jenkins owns the deployment artifact and environment variables. Without this, every `terraform apply` would undo whatever the last pipeline run deployed.
+Terraform owns the function runtime, memory, timeout, and IAM configuration. Jenkins owns the deployment artifact and environment variables. Without this separation, each `terraform apply` would undo the latest pipeline deployment.
 
-### Getting It Running
+### Getting it running
 
 Copy the example vars file and fill it in:
 
@@ -299,9 +299,9 @@ cd terraform
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-You'll need an EC2 AMI ID (Ubuntu 22.04 LTS in your region), a key pair name, your Jenkins server's IP, and your MongoDB credentials.
+The variables file needs an EC2 AMI ID for Ubuntu 22.04 LTS in the chosen region, a key pair name, the Jenkins server's IP address, and the MongoDB credentials.
 
-Create the S3 bucket for remote state first if you want it:
+To use remote state, create its S3 bucket first:
 
 ```bash
 aws s3api create-bucket \
@@ -310,7 +310,7 @@ aws s3api create-bucket \
     --create-bucket-configuration LocationConstraint=ap-south-1
 ```
 
-Then run the usual:
+Then initialize and apply the configuration:
 
 ```bash
 terraform init
@@ -318,42 +318,42 @@ terraform plan
 terraform apply
 ```
 
-After apply finishes, the outputs give you the EC2 IP and Lambda Function URL. Put both into the `Jenkinsfile` before your first pipeline run.
+After `terraform apply` finishes, its outputs include the EC2 IP address and Lambda Function URL. Add both values to the `Jenkinsfile` before the first pipeline run.
 
-## Things That Caught Me Out
+## Things that caught me out
 
-**OWASP Dependency-Check is slow on a fresh agent.** The NVD database download takes 10+ minutes the first time. Caching the database directory between runs cuts that down to seconds.
+OWASP Dependency-Check is slow on a fresh agent. The first NVD database download takes more than 10 minutes. Caching its database directory between runs cuts later scans to seconds.
 
-**`dnsPolicy: Default` on Kubernetes pods.** The cluster's default DNS setting (`ClusterFirst`) routes everything through the internal resolver, which has no idea what an external MongoDB hostname is. Switching to `Default` uses the node's resolver. Took too long to figure that one out.
+Kubernetes pods needed `dnsPolicy: Default`. The cluster's `ClusterFirst` setting routes lookups through its internal resolver, which could not resolve my external MongoDB hostname. Switching to `Default` uses the node's resolver. This took me far too long to trace.
 
-**Trivy exits 0 unless you say otherwise.** If you don't set `--exit-code 1` on the critical scan, Trivy will find critical vulnerabilities and still report success. A lot of setups that say "Trivy is clean" are actually just not checking the exit code.
+Trivy exits with code 0 unless told otherwise. Without `--exit-code 1` on the critical scan, it can find critical vulnerabilities and still report success. Some supposedly clean Trivy builds are only ignoring the exit code.
 
-**ZAP's crawler is useless on REST APIs.** The traditional ZAP spider crawls HTML links. Use `-f openapi` to point it at your OpenAPI spec instead — it discovers and tests exactly the documented endpoints.
+ZAP's traditional crawler is useless for this REST API because it looks for HTML links. The `-f openapi` option points it at the OpenAPI specification, so it discovers and tests the documented endpoints instead.
 
-**Sealed Secrets are not auto-rotated.** If you need to update a MongoDB password, you re-seal the secret locally with the cluster's public key and commit the new encrypted file. The controller picks it up. Just don't lose the key.
+Sealed Secrets do not rotate themselves. To update a MongoDB password, I seal the new value locally with the cluster's public key and commit the new encrypted file. The controller then applies it. Losing the key would make the existing files impossible to decrypt.
 
-## Tools Used — Quick Reference
+## Tool reference
 
 | Tool                       | What it does in this pipeline                                  |
 | -------------------------- | -------------------------------------------------------------- |
-| **Jenkins**                | Runs the pipeline, manages credentials, publishes reports      |
-| **Docker / DockerHub**     | Builds and stores the app image, tagged by commit SHA          |
-| **SonarQube**              | Static code analysis with a quality gate that blocks the build |
-| **OWASP Dependency-Check** | Scans npm packages against the NIST CVE database               |
-| **Trivy**                  | Scans the Docker image for OS and package vulnerabilities      |
-| **OWASP ZAP**              | Dynamic testing against the live running app                   |
-| **Kubernetes**             | Runs the app in production (2 replicas, NodePort on 30000)     |
-| **ArgoCD**                 | Watches the GitOps repo and syncs the cluster on PR merge      |
-| **Gitea**                  | Self-hosted Git server, hosts the GitOps manifest repo         |
-| **Bitnami Sealed Secrets** | Encrypts Kubernetes secrets so they can be committed to Git    |
-| **AWS EC2**                | Staging environment for feature branches                       |
-| **AWS Lambda**             | Production environment for the main branch                     |
-| **AWS S3**                 | Stores build reports and Lambda deployment zips                |
-| **Terraform**              | Provisions all AWS infrastructure from code                    |
-| **Slack**                  | Gets a message on every build with pass/fail and a link        |
+| Jenkins                    | Runs the pipeline, manages credentials, publishes reports      |
+| Docker / DockerHub         | Builds and stores the app image, tagged by commit SHA          |
+| SonarQube                  | Static code analysis with a quality gate that blocks the build |
+| OWASP Dependency-Check     | Scans npm packages against the NIST CVE database               |
+| Trivy                      | Scans the Docker image for OS and package vulnerabilities      |
+| OWASP ZAP                  | Dynamic testing against the live running app                   |
+| Kubernetes                 | Runs the app in production with 2 replicas on NodePort 30000   |
+| ArgoCD                     | Watches the GitOps repo and syncs the cluster on PR merge      |
+| Gitea                      | Self-hosted Git server that hosts the GitOps manifest repo     |
+| Bitnami Sealed Secrets     | Encrypts Kubernetes secrets for storage in Git                 |
+| AWS EC2                    | Staging environment for feature branches                       |
+| AWS Lambda                 | Production environment for the main branch                     |
+| AWS S3                     | Stores build reports and Lambda deployment zips                |
+| Terraform                  | Provisions all AWS infrastructure from code                    |
+| Slack                      | Sends each build result and link                                |
 
-## Wrapping Up
+## What I would build first
 
-The full source — app, Jenkinsfile, Kubernetes manifests, and Terraform modules — is at [github.com/mortal22soul/e2e-cicd-pipeline](https://github.com/mortal22soul/e2e-cicd-pipeline).
+The full source includes the application, `Jenkinsfile`, Kubernetes manifests, and Terraform modules. It is available at [github.com/mortal22soul/e2e-cicd-pipeline](https://github.com/mortal22soul/e2e-cicd-pipeline).
 
-If you're setting this up yourself: add the stages one at a time. Get unit tests and the Docker build clean first. Then SonarQube. Then Trivy. OWASP and ZAP last. Each tool adds some noise you need to tune out before the next one makes sense.
+If I were setting this up again, I would add one stage at a time. I would get the unit tests and Docker build passing first, then add SonarQube and Trivy. OWASP Dependency-Check and ZAP would come last. Every scanner produces some noise, and tuning one is much easier before another starts adding findings.
