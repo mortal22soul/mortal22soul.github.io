@@ -43,6 +43,14 @@ article {
   @apply prose-headings:text-black prose-headings:dark:text-white;
 }
 
+article pre.mermaid {
+  @apply my-8 overflow-x-auto rounded-lg bg-white p-4 text-center dark:bg-stone-800;
+}
+
+article pre.mermaid svg {
+  @apply mx-auto h-auto max-w-full;
+}
+
 @layer utilities {
   article a {
     @apply font-sans text-current underline underline-offset-2;

@@ -45,3 +45,46 @@ const { Content } = await render(post);
     </article>
   </Container>
 </PageLayout>
+
+<script>
+  let mermaidModule: Promise<typeof import("mermaid")> | undefined;
+  let renderRequest = 0;
+
+  async function renderMermaidDiagrams() {
+    const diagrams = Array.from(
+      document.querySelectorAll<HTMLElement>("pre.mermaid"),
+    );
+    if (diagrams.length === 0) return;
+
+    const request = ++renderRequest;
+    mermaidModule ??= import("mermaid");
+    const { default: mermaid } = await mermaidModule;
+    if (request !== renderRequest) return;
+
+    for (const diagram of diagrams) {
+      diagram.dataset.mermaidSource ??= diagram.textContent ?? "";
+      diagram.textContent = diagram.dataset.mermaidSource;
+      diagram.removeAttribute("data-processed");
+    }
+
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: document.documentElement.classList.contains("dark")
+        ? "dark"
+        : "default",
+    });
+    await mermaid.run({ nodes: diagrams });
+  }
+
+  document.addEventListener("astro:page-load", renderMermaidDiagrams);
+
+  new MutationObserver((mutations) => {
+    if (mutations.some((mutation) => mutation.attributeName === "class")) {
+      void renderMermaidDiagrams();
+    }
+  }).observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["class"],
+  });
+</script>
